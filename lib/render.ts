@@ -9,6 +9,7 @@ import { fontsForPair } from "./fonts";
 import { STYLES, luminance } from "./styles";
 import { mmToPx } from "./formats";
 import { seededRandom } from "./waveform";
+import { readBuffer, writeBuffer } from "./cache";
 
 /** Cover als Data-URL — Vorschau klein, Export in voller Auflösung. */
 async function coverDataUrl(
@@ -31,17 +32,73 @@ async function coverDataUrl(
 }
 
 /**
- * Scan-Code als rein dekoratives Element: Spotify-Logo plus Strichmuster,
- * lokal als SVG gezeichnet (kein echter Link, kein Netzwerk). Das Muster ist
- * mit der Album-ID gesät — dieselbe Platte sieht immer gleich aus.
+ * Scan-Code neben der Tracklist.
+ *
+ * Wenn das Album eine Spotify-URI hat, wird der **echte** Spotify-Code über
+ * scannables.scdn.co geholt — der ist mit der Spotify-App wirklich scanbar und
+ * führt zum Album. Das Strichmuster lässt sich nicht selbst berechnen: die
+ * Balkenhöhen kodieren eine Referenz-ID, die nur Spotifys Server kennt.
+ *
+ * Ohne URI (Deezer, Demo) oder wenn der Endpunkt nicht erreichbar ist, wird
+ * ein optisch gleichwertiges, rein dekoratives Muster lokal gezeichnet.
  */
-function scanDataUrl(
+async function scanDataUrl(
   album: Album,
   config: PosterConfig
-): { url: string; aspect: number } | null {
+): Promise<{ url: string; aspect: number; real: boolean } | null> {
   if (!config.show.scanCode) return null;
   const tokens = resolveTokensBg(album, config);
   const dark = luminance(tokens.bg) <= 0.5;
+
+  if (album.spotifyUri) {
+    const key = `scan:${album.spotifyUri}:${tokens.bg}:${dark}`;
+    const cached = readBuffer("scan", key);
+    if (cached) {
+      try {
+        return JSON.parse(cached.toString("utf8"));
+      } catch {
+        // Cache-Eintrag unbrauchbar → neu holen
+      }
+    }
+    try {
+      const bgHex = tokens.bg.replace("#", "");
+      const bars = dark ? "white" : "black";
+      const url = `https://scannables.scdn.co/uri/plain/svg/${bgHex}/${bars}/640/${album.spotifyUri}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        let svg = await res.text();
+        if (svg.includes("<svg")) {
+          // Hintergrundfläche entfernen, damit der Code auf Verläufen und
+          // Texturen nicht als Farbblock aufliegt
+          svg = svg.replace(
+            new RegExp(`<rect[^>]*fill="${tokens.bg}"[^>]*/>`, "gi"),
+            ""
+          );
+          const w = Number(svg.match(/width="([\d.]+)"/)?.[1] ?? 640);
+          const h = Number(svg.match(/height="([\d.]+)"/)?.[1] ?? 160);
+          const result = {
+            url: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+            aspect: h > 0 && w > 0 ? h / w : 0.25,
+            real: true,
+          };
+          writeBuffer("scan", key, Buffer.from(JSON.stringify(result), "utf8"));
+          return result;
+        }
+      }
+    } catch {
+      // Endpunkt nicht erreichbar → dekoratives Muster
+    }
+  }
+
+  return decorativeScan(album, tokens.bg, dark);
+}
+
+/** Rein dekoratives Scan-Code-Motiv: Spotify-Logo plus Strichmuster. */
+function decorativeScan(
+  album: Album,
+  bg: string,
+  dark: boolean
+): { url: string; aspect: number; real: boolean } {
   const fg = dark ? "#FFFFFF" : "#000000";
 
   const W = 640;
@@ -49,24 +106,23 @@ function scanDataUrl(
   const cx = 80;
   const cy = H / 2;
 
-  // Strichmuster: 23 Balken mit runden Enden, vertikal zentriert
+  // 23 Balken mit runden Enden, Höhen in 8 Stufen wie beim Original
   const rnd = seededRandom(`scan:${album.id}`);
   const bars: string[] = [];
   const count = 23;
   const barW = 9;
   const gap = (W - 176 - 24 - count * barW) / (count - 1);
   for (let i = 0; i < count; i++) {
-    const h = 24 + Math.round(rnd() * 104);
+    const h = 24 + Math.round(rnd() * 7) * 16;
     const x = 176 + i * (barW + gap);
     bars.push(
       `<rect x="${x.toFixed(1)}" y="${(cy - h / 2).toFixed(1)}" width="${barW}" height="${h}" rx="${barW / 2}" fill="${fg}"/>`
     );
   }
 
-  // Spotify-Logo: gefüllter Kreis, drei Bögen in der Hintergrundfarbe
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <circle cx="${cx}" cy="${cy}" r="56" fill="${fg}"/>
-  <g stroke="${tokens.bg}" fill="none" stroke-linecap="round">
+  <g stroke="${bg}" fill="none" stroke-linecap="round">
     <path d="M 52,${cy - 16} C 72,${cy - 24} 96,${cy - 22} 112,${cy - 12}" stroke-width="9.5"/>
     <path d="M 55,${cy + 2} C 73,${cy - 5} 94,${cy - 3} 108,${cy + 5}" stroke-width="8.5"/>
     <path d="M 58,${cy + 19} C 73,${cy + 13} 91,${cy + 15} 103,${cy + 21}" stroke-width="7.5"/>
@@ -77,6 +133,7 @@ function scanDataUrl(
   return {
     url: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
     aspect: H / W,
+    real: false,
   };
 }
 
@@ -98,7 +155,7 @@ export async function renderSvg(
   const fonts = fontsForPair(pair);
 
   // Vorschau: Cover auf 700 px begrenzen, Export: volle Auflösung
-  const scan = scanDataUrl(album, config);
+  const scan = await scanDataUrl(album, config);
   const assets: PosterAssets = {
     coverDataUrl: await coverDataUrl(album, config, opts.preview ? 700 : 4000),
     scanDataUrl: scan?.url ?? null,

@@ -481,6 +481,13 @@ function Editor() {
                   )
                 )}
               </div>
+              {config.show.scanCode && (
+                <p className="text-[10px] text-[#888] mt-1.5">
+                  {album?.spotifyUri
+                    ? "Echter Spotify-Code — mit der Spotify-App scanbar, führt zum Album."
+                    : "Dekoratives Muster (kein Spotify-Album) — sieht gleich aus, ist aber nicht scanbar."}
+                </p>
+              )}
               {config.show.parentalAdvisory && (
                 <p className="text-[10px] text-[#888] mt-1.5">
                   Prüfe, ob dein Cover das Logo schon enthält — viele haben es
