@@ -1,0 +1,22 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# misc
+.DS_Store
+*.pem
+
+# env
+.env
+.env.local
+.env*.local
+
+# lokaler Daten-Cache (Alben, Cover)
+/.cache/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
