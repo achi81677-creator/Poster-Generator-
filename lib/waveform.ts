@@ -2,7 +2,7 @@
 // Trackdauern — dieselbe Platte sieht immer gleich aus.
 import type { Album } from "./types";
 
-function seededRandom(seed: string) {
+export function seededRandom(seed: string) {
   let h = 2166136261;
   for (const c of seed) {
     h ^= c.charCodeAt(0);

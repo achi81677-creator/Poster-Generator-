@@ -14,7 +14,7 @@ import type { FontSpec } from "./fonts";
 export type PosterAssets = {
   coverDataUrl: string | null;
   scanDataUrl: string | null;
-  /** Höhe/Breite des Scan-Codes: 0.25 für Spotify-Codes, 1 für QR. */
+  /** Höhe/Breite des Scan-Code-Elements (Logo + Striche), i. d. R. 0.25. */
   scanAspect: number;
 };
 
@@ -280,10 +280,9 @@ function metaBlocks(ctx: Ctx, fs: number): El[] {
 function scanBlock(ctx: Ctx, width: number): El | null {
   if (!ctx.config.show.scanCode || !ctx.assets.scanDataUrl) return null;
   const aspect = ctx.assets.scanAspect || 0.25;
-  const w = aspect === 1 ? width * 0.5 : width; // QR quadratisch und kleiner
   return img(ctx.assets.scanDataUrl, {
-    width: w,
-    height: w * aspect,
+    width,
+    height: width * aspect,
     marginTop: width * 0.06,
   });
 }

@@ -48,7 +48,8 @@ direkt in diesem Ordner.
   (grün ≥ 250, gelb ≥ 150, rot darunter)
 - **Farbpalette aus dem Cover** (Median-Cut mit Sättigungsgewichtung, Dedupe)
 - **Waveform** (deterministisch aus Album-ID + Trackdauern — lädt man neu,
-  sieht sie gleich aus), **Spotify-Scan-Code** (Fallback: QR-Code),
+  sieht sie gleich aus), **Scan-Code-Element** (Spotify-Logo + Strichmuster,
+  rein dekorativ, lokal als Vektor gezeichnet und pro Album deterministisch),
   **Parental-Advisory-Logo** als Vektor (automatisch an, wenn ein Track explizit ist)
 - **Tracklist** mit 1–3 Spalten (auto), automatischer Schriftverkleinerung,
   Doppelalbum-Nummerierung (`1-01`), optionalem Entfernen von „(feat. …)“
@@ -87,9 +88,9 @@ Stile sind reine Token-Objekte in `lib/styles.ts` — ein neuer Stil ist ~10 Zei
   maximal 300 DPI und bleibt klein.
 - **600 DPI** bringt für das Foto-Cover nichts (kein Druck löst feiner als
   ~300 PPI auf), es schärft nur Text und Linien — dafür ist PDF der bessere Weg.
-- **Scan-Code**: `scannables.scdn.co` ist ein inoffizieller Endpunkt. Fällt er
-  aus (oder gibt es keine Spotify-URI), kommt automatisch ein QR-Code auf die
-  Album-URL; fällt auch der aus, bleibt der Bereich einfach leer.
+- **Scan-Code**: rein dekorativ (Spotify-Logo + Striche im Scan-Code-Look) —
+  kein echter Link, kein Netzwerkzugriff, das Muster ist mit der Album-ID
+  gesät und damit stabil.
 - **Windows**: Projekt nicht in einen OneDrive-Ordner legen, lange Pfade
   aktivieren (`git config --system core.longpaths true`). `cross-env` ist
   bereits eingerichtet. Eine `start.bat` könnte so aussehen:
